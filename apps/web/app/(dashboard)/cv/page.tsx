@@ -38,14 +38,14 @@ function StepIndicator({ current }: { current: ProcessStep }) {
   const activeIdx = stepIndex(current);
 
   return (
-    <div className="grid gap-3 sm:grid-cols-5">
+    <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 lg:grid-cols-5">
       {STEP_ORDER.slice(0, -1).map((step, i) => {
         const done = activeIdx > i;
         const active = STEP_ORDER[activeIdx] === step || (current === "done" && i === 4);
         return (
           <div
             key={step}
-            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+            className={`flex items-center gap-2 rounded-lg border px-2 py-2 text-xs transition-colors sm:px-3 sm:text-sm ${
               done
                 ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
                 : active
@@ -149,10 +149,10 @@ export default function CVPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
+    <div className="mx-auto max-w-4xl space-y-6 md:space-y-8">
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-white">CV Analyzer</h1>
-        <p className="mt-2 text-white/50">
+        <h1 className="text-2xl font-bold text-white sm:text-3xl">CV Analyzer</h1>
+        <p className="mt-2 text-sm text-white/50 sm:text-base">
           Upload → Read PDF → Extract Text → Analyze Skills → Match Score
         </p>
         <p className="mt-1 text-xs text-emerald-400/80">
@@ -178,7 +178,7 @@ export default function CVPage() {
             isDragActive ? "border-violet-500 bg-violet-500/10" : ""
           } ${processing ? "pointer-events-none opacity-60" : ""}`}
         >
-          <CardContent className="flex flex-col items-center justify-center py-20">
+          <CardContent className="flex flex-col items-center justify-center py-12 sm:py-20">
             <input {...getInputProps()} />
             {processing ? (
               <Loader2 className="h-12 w-12 animate-spin text-violet-400" />
@@ -202,7 +202,7 @@ export default function CVPage() {
       {result && (
         <>
           <Card className="border-emerald-500/20 bg-emerald-500/5">
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <CheckCircle2 className="h-6 w-6 text-emerald-400" />
                 <div>

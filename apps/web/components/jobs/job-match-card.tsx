@@ -24,10 +24,10 @@ export function JobMatchCard({ match, onSave, onDetails }: Props) {
   return (
     <Card className="group transition-all hover:border-violet-500/30 hover:shadow-violet-500/10">
       <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-4">
-          <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <CardTitle className="text-base">{match.job.title}</CardTitle>
+              <CardTitle className="text-base leading-snug">{match.job.title}</CardTitle>
               {isDemoJob(match.job) ? (
                 <Badge variant="warning">Demo listing</Badge>
               ) : (
@@ -39,7 +39,7 @@ export function JobMatchCard({ match, onSave, onDetails }: Props) {
               {match.job.salary_text && ` · ${match.job.salary_text}`}
             </p>
           </div>
-          <div className="text-right">
+          <div className="shrink-0 sm:text-right">
             <div className={cn("text-2xl font-bold", scoreColor)}>{match.match_score}%</div>
             <div className="text-xs text-white/40">Match</div>
           </div>
@@ -53,7 +53,7 @@ export function JobMatchCard({ match, onSave, onDetails }: Props) {
           ))}
         </div>
         {match.missing_skills.length > 0 && (
-          <div className="text-sm text-white/50">
+          <div className="text-sm text-white/50 break-words">
             Missing:{" "}
             {match.missing_skills.slice(0, 3).map((s, i) => (
               <span key={s}>
@@ -68,17 +68,17 @@ export function JobMatchCard({ match, onSave, onDetails }: Props) {
             Learn missing skills to reach {match.potential_score}% match
           </p>
         )}
-        <div className="flex gap-2 pt-2">
-          <a href={applyHref} target="_blank" rel="noopener noreferrer">
-            <Button size="sm" className="gap-1">
+        <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:flex-wrap">
+          <a href={applyHref} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">
+            <Button size="sm" className="w-full gap-1 sm:w-auto">
               {hasDirectApply ? "Apply" : "Find on TopJobs"}{" "}
               <ExternalLink className="h-3 w-3" />
             </Button>
           </a>
-          <Button size="sm" variant="secondary" className="gap-1" onClick={onDetails}>
+          <Button size="sm" variant="secondary" className="w-full gap-1 sm:w-auto" onClick={onDetails}>
             <Eye className="h-3 w-3" /> Details
           </Button>
-          <Button size="sm" variant="ghost" className="gap-1" onClick={onSave}>
+          <Button size="sm" variant="ghost" className="w-full gap-1 sm:w-auto" onClick={onSave}>
             <Bookmark className="h-3 w-3" /> Save
           </Button>
         </div>

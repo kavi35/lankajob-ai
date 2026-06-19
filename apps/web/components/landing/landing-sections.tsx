@@ -1,29 +1,32 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { Sparkles, ArrowRight } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Sparkles, ArrowRight, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isClerkConfigured } from "@/lib/auth-config";
 
 export function Navbar() {
+  const [open, setOpen] = useState(false);
+
   return (
     <motion.nav
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       className="fixed top-0 z-50 w-full border-b border-white/10 bg-black/30 backdrop-blur-xl"
     >
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:h-16 sm:px-6">
         <Link href="/" className="flex items-center gap-2 font-semibold text-white">
           <Sparkles className="h-5 w-5 text-violet-400" />
-          LankaJob AI
+          <span className="text-sm sm:text-base">LankaJob AI</span>
         </Link>
         <div className="hidden items-center gap-8 text-sm text-white/70 md:flex">
           <Link href="#features" className="hover:text-white">Features</Link>
           <Link href="#testimonials" className="hover:text-white">Testimonials</Link>
           <Link href="/pricing" className="hover:text-white">Pricing</Link>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="hidden items-center gap-3 md:flex">
           <Link href={isClerkConfigured() ? "/sign-in" : "/dashboard"}>
             <Button variant="ghost" size="sm">Sign in</Button>
           </Link>
@@ -31,27 +34,57 @@ export function Navbar() {
             <Button size="sm">Get Started</Button>
           </Link>
         </div>
+        <button
+          type="button"
+          aria-label="Menu"
+          className="rounded-lg p-2 text-white md:hidden"
+          onClick={() => setOpen((v) => !v)}
+        >
+          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
       </div>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden border-t border-white/10 bg-black/90 md:hidden"
+          >
+            <div className="flex flex-col gap-1 px-4 py-3">
+              <Link href="#features" className="rounded-lg px-3 py-2 text-white/80 hover:bg-white/5" onClick={() => setOpen(false)}>Features</Link>
+              <Link href="#testimonials" className="rounded-lg px-3 py-2 text-white/80 hover:bg-white/5" onClick={() => setOpen(false)}>Testimonials</Link>
+              <Link href="/pricing" className="rounded-lg px-3 py-2 text-white/80 hover:bg-white/5" onClick={() => setOpen(false)}>Pricing</Link>
+              <Link href={isClerkConfigured() ? "/sign-in" : "/cv"} className="mt-2" onClick={() => setOpen(false)}>
+                <Button variant="secondary" className="w-full">Sign in</Button>
+              </Link>
+              <Link href={isClerkConfigured() ? "/sign-up" : "/cv"} onClick={() => setOpen(false)}>
+                <Button className="w-full">Get Started</Button>
+              </Link>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.nav>
   );
 }
 
 export function Hero() {
   return (
-    <section className="relative overflow-hidden pt-32 pb-20">
+    <section className="relative overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-20">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-900/40 via-transparent to-transparent" />
-      <div className="relative mx-auto max-w-7xl px-6 text-center">
+      <div className="relative mx-auto max-w-7xl px-4 text-center sm:px-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <span className="mb-6 inline-block rounded-full border border-violet-500/30 bg-violet-500/10 px-4 py-1.5 text-sm text-violet-200">
+          <span className="mb-4 inline-block rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-xs text-violet-200 sm:mb-6 sm:px-4 sm:py-1.5 sm:text-sm">
             AI-Powered Job Matching for Sri Lanka
           </span>
-          <h1 className="mx-auto max-w-4xl text-5xl font-bold tracking-tight text-white md:text-7xl">
+          <h1 className="mx-auto max-w-4xl text-3xl font-bold tracking-tight text-white sm:text-5xl md:text-7xl">
             Find your perfect job with{" "}
             <span className="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">
               AI precision
             </span>
           </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg text-white/60">
+          <p className="mx-auto mt-4 max-w-2xl text-base text-white/60 sm:mt-6 sm:text-lg">
             Upload your CV and let LankaJob AI match you with the best opportunities from TopJobs,
             XpressJobs, LinkedIn, and top company career pages across Sri Lanka.
           </p>
