@@ -13,19 +13,33 @@ If Root Directory is wrong, builds fail (e.g. "no start script" at repo root, or
 
 ## Web service (Next.js)
 
-1. **Settings** → **Root Directory** → `apps/web`
-2. **Settings** → **Deploy** — clear any custom `--workspace=web` commands:
-   - Build: `npm run build` (or leave empty; `apps/web/railway.toml` sets this)
-   - Start: `npm run start`
-3. **Variables** (optional Clerk):
-   ```
-   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
-   CLERK_SECRET_KEY=sk_...
-   NEXT_PUBLIC_API_URL=https://YOUR-API-RAILWAY-URL
-   ```
-4. **Networking** → **Generate Domain**
+**If logs say `Found workspace with 1 packages`**, Railway is building from the **repo root**, not `apps/web`.
 
-Config files: `apps/web/railway.toml`, `apps/web/nixpacks.toml`
+### Option A — Root Directory `apps/web` (recommended)
+
+1. **Settings** → **Root Directory** → `apps/web`
+2. **Settings** → **Deploy** — clear custom `--workspace=web` commands:
+   - Build: `npm run build` (or leave empty)
+   - Start: `npm run start`
+3. Railpack reads `apps/web/railpack.json` automatically.
+
+### Option B — Repo root (monorepo)
+
+If Root Directory is blank or `/`, the repo includes `railpack.json` at the root with:
+- Build: `npm run build --workspace=web`
+- Start: `npm run start --workspace=web`
+
+### Env vars (web service)
+
+```
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
+CLERK_SECRET_KEY=sk_...
+NEXT_PUBLIC_API_URL=https://YOUR-API-RAILWAY-URL
+```
+
+**Networking** → **Generate Domain**
+
+Config files: `railpack.json` (root or `apps/web`), `apps/web/railway.toml`
 
 ---
 
