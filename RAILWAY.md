@@ -37,6 +37,12 @@ If **Watch Paths** is set to `/apps/web/**`, that is fine. Root Directory must s
 
 ### 5. Env vars
 
+Optional build-time variable if Tailwind/lightningcss fails:
+
+```
+NPM_CONFIG_PRODUCTION=false
+```
+
 ```
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
 CLERK_SECRET_KEY=sk_...
