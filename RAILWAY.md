@@ -1,35 +1,41 @@
 # Railway deployment
 
-This monorepo has two apps. Each Railway **service** must set **Root Directory** to the correct folder.
+This monorepo has two apps. Each Railway **service** must set **Root Directory** correctly.
 
 | Service | Root Directory | Start command |
 |---------|----------------|---------------|
 | **web** (Next.js) | `apps/web` | `npm run start` |
 | **api** (FastAPI) | `apps/api` | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
 
-If Root Directory is wrong, builds fail (e.g. "no start script" at repo root, or `npm install` peer errors).
-
 ---
 
-## Web service (Next.js)
+## Web service (Next.js) — required settings
 
-**If logs say `Found workspace with 1 packages`**, Railway is building from the **repo root**, not `apps/web`.
+### 1. Root Directory (critical)
 
-### Option A — Root Directory `apps/web` (recommended)
+**Settings** → **Root Directory** → `apps/web`
 
-1. **Settings** → **Root Directory** → `apps/web`
-2. **Settings** → **Deploy** — clear custom `--workspace=web` commands:
-   - Build: `npm run build` (or leave empty)
-   - Start: `npm run start`
-3. Railpack reads `apps/web/railpack.json` automatically.
+If this is wrong, builds fail with errors like:
+- `No start command detected`
+- `ENOENT: no such file or directory, open '/app/package.json'`
+- `Found workspace with 1 packages` + `--workspace=web` commands
 
-### Option B — Repo root (monorepo)
+### 2. Clear dashboard overrides
 
-If Root Directory is blank or `/`, the repo includes `railpack.json` at the root with:
-- Build: `npm run build --workspace=web`
-- Start: `npm run start --workspace=web`
+**Settings** → **Deploy** — remove custom commands that reference the monorepo root:
+- Do **not** use `npm run build --workspace=web`
+- Do **not** use `npm run start --workspace=web`
+- Leave build/start **empty** (Railpack auto-detects from `apps/web/package.json`)
 
-### Env vars (web service)
+### 3. Remove bad env vars (if set)
+
+Delete `RAILPACK_CONFIG_FILE` if it points outside `apps/web`.
+
+### 4. Watch paths
+
+If **Watch Paths** is set to `/apps/web/**`, that is fine. Root Directory must still be `apps/web`.
+
+### 5. Env vars
 
 ```
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
@@ -39,7 +45,7 @@ NEXT_PUBLIC_API_URL=https://YOUR-API-RAILWAY-URL
 
 **Networking** → **Generate Domain**
 
-Config files: `railpack.json` (root or `apps/web`), `apps/web/railway.toml`
+Config: `apps/web/railpack.json` (start command only), `apps/web/.npmrc`
 
 ---
 
@@ -61,13 +67,9 @@ Config files: `railpack.json` (root or `apps/web`), `apps/web/railway.toml`
 4. **Networking** → **Generate Domain**
 5. Test: `https://YOUR-API-URL/health`
 
-Config files: `apps/api/railway.toml`, `apps/api/nixpacks.toml`
-
 ---
 
 ## Vercel (alternative for web)
-
-You can host the frontend on Vercel instead of Railway:
 
 - Root Directory: `apps/web`
 - `NEXT_PUBLIC_API_URL` → Railway API URL

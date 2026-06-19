@@ -1,7 +1,7 @@
 # Railway config when Root Directory = apps/web
 
 [build]
-buildCommand = "npm run build"
+builder = "RAILPACK"
 
 [deploy]
 startCommand = "npm run start"
