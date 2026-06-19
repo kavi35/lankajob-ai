@@ -79,13 +79,32 @@ python -m app.workers.scheduler
 
 ## Deployment
 
-### Vercel (Frontend)
+### Vercel only (no database — simplest)
+
+Works without Railway, Supabase, or PostgreSQL. CV data stays in the browser; jobs are scraped from TopJobs.lk via Vercel serverless functions.
+
+1. Import repo on [Vercel](https://vercel.com), set **Root Directory** to `apps/web`
+2. Environment variables:
+   ```
+   NEXT_PUBLIC_STANDALONE=true
+   ```
+   Do **not** set `NEXT_PUBLIC_API_URL` (or leave it empty).
+3. Deploy — done.
+
+Optional: add Clerk keys for sign-in. Without Clerk, the app runs in open dev mode.
+
+### Vercel + Railway + Supabase (full stack)
+
+For persistent CV storage, PostgreSQL, and background job scraping:
+
+#### Vercel (Frontend)
 
 1. Import repo, set root directory to `apps/web`
 2. Add env vars: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `NEXT_PUBLIC_API_URL`
-3. Deploy
+3. Set `NEXT_PUBLIC_STANDALONE=false`
+4. Deploy
 
-### Railway (Backend)
+#### Railway (Backend)
 
 1. Create service from `apps/api/Dockerfile`
 2. Add PostgreSQL plugin or Supabase `DATABASE_URL`

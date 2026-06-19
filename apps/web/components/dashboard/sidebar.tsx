@@ -14,8 +14,9 @@ import {
 import { UserButton } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import { isClerkConfigured } from "@/lib/auth-config";
+import { isStandaloneMode } from "@/lib/standalone/config";
 
-const navItems = [
+const fullNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/cv", label: "My CV", icon: FileText },
   { href: "/matches", label: "Job Matches", icon: Briefcase },
@@ -24,8 +25,14 @@ const navItems = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
+const simpleNav = [
+  { href: "/cv", label: "CV Analyzer", icon: FileText },
+  { href: "/matches", label: "Job Matches", icon: Briefcase },
+];
+
 export function Sidebar() {
   const pathname = usePathname();
+  const navItems = isStandaloneMode() ? simpleNav : fullNav;
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-white/10 bg-black/40 backdrop-blur-xl">
@@ -54,7 +61,9 @@ export function Sidebar() {
         {isClerkConfigured() ? (
           <UserButton />
         ) : (
-          <span className="text-xs text-white/40">Dev mode (no auth)</span>
+          <span className="text-xs text-white/40">
+            {isStandaloneMode() ? "Vercel-only · no database" : "Dev mode (no auth)"}
+          </span>
         )}
       </div>
     </aside>

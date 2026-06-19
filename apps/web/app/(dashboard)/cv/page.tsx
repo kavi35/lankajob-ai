@@ -1,79 +1,115 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useDropzone } from "react-dropzone";
-import { Upload, FileText, Loader2, Sparkles, ArrowRight, Trash2 } from "lucide-react";
+import {
+  Upload,
+  FileText,
+  Loader2,
+  CheckCircle2,
+  Circle,
+  Sparkles,
+  Briefcase,
+} from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { JobMatchCard } from "@/components/jobs/job-match-card";
-import { useApiClient } from "@/lib/api-providers";
-import type { CV, CVProfile, JobMatch, SearchSession } from "@/lib/api-client";
+import { isStandaloneMode } from "@/lib/standalone/config";
+import {
+  clearSavedResult,
+  loadSavedResult,
+  processCvFile,
+  STEP_LABELS,
+  STEP_ORDER,
+  type CvAnalysisResult,
+  type ProcessStep,
+} from "@/lib/standalone/process-cv";
+
+function stepIndex(step: ProcessStep): number {
+  if (step === "error") return -1;
+  if (step === "done") return STEP_ORDER.length;
+  return STEP_ORDER.indexOf(step);
+}
+
+function StepIndicator({ current }: { current: ProcessStep }) {
+  const activeIdx = stepIndex(current);
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-5">
+      {STEP_ORDER.slice(0, -1).map((step, i) => {
+        const done = activeIdx > i;
+        const active = STEP_ORDER[activeIdx] === step || (current === "done" && i === 4);
+        return (
+          <div
+            key={step}
+            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+              done
+                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+                : active
+                  ? "border-violet-500/50 bg-violet-500/10 text-violet-200"
+                  : "border-white/10 bg-white/5 text-white/40"
+            }`}
+          >
+            {done ? (
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+            ) : active ? (
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-violet-400" />
+            ) : (
+              <Circle className="h-4 w-4 shrink-0" />
+            )}
+            <span className="truncate">{STEP_LABELS[step]}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function CVPage() {
-  const api = useApiClient();
-  const router = useRouter();
-  const [cvs, setCvs] = useState<CV[]>([]);
-  const [profile, setProfile] = useState<CVProfile | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [analyzingId, setAnalyzingId] = useState<string | null>(null);
-  const [searching, setSearching] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [jobMatches, setJobMatches] = useState<JobMatch[]>([]);
-  const activeCv = cvs[0] ?? null;
-  const olderCvs = cvs.slice(1);
-
-  const loadMatches = useCallback(async () => {
-    try {
-      const data = await api.fetch<JobMatch[]>("/api/v1/matches?min_score=0");
-      setJobMatches(data);
-    } catch {
-      // Matches load on demand after search
-    }
-  }, [api]);
-
-  const loadCvs = useCallback(async () => {
-    const data = await api.fetch<CV[]>("/api/v1/cv");
-    setCvs(data);
-    const current = data[0];
-    if (current?.status === "analyzed") {
-      try {
-        const p = await api.fetch<CVProfile>(`/api/v1/cv/${current.id}/profile`);
-        setProfile(p);
-      } catch {
-        setProfile(null);
-      }
-    } else {
-      setProfile(null);
-    }
-  }, [api]);
+  const [result, setResult] = useState<CvAnalysisResult | null>(null);
+  const [currentStep, setCurrentStep] = useState<ProcessStep>("upload");
+  const [statusMsg, setStatusMsg] = useState("");
+  const [processing, setProcessing] = useState(false);
+  const [showText, setShowText] = useState(false);
 
   useEffect(() => {
-    loadCvs().catch((e) => toast.error(e instanceof Error ? e.message : "Failed to load CVs"));
-    loadMatches();
-  }, [loadCvs, loadMatches]);
+    const saved = loadSavedResult();
+    if (saved) {
+      setResult(saved);
+      setCurrentStep("done");
+    }
+  }, []);
+
+  const runPipeline = useCallback(async (file: File) => {
+    setProcessing(true);
+    setResult(null);
+    setCurrentStep("upload");
+    try {
+      const data = await processCvFile(file, (step, msg) => {
+        setCurrentStep(step);
+        if (msg) setStatusMsg(msg);
+      });
+      setResult(data);
+      setCurrentStep("done");
+      toast.success("CV analyzed — results ready!");
+    } catch (e) {
+      setCurrentStep("error");
+      toast.error(e instanceof Error ? e.message : "Processing failed");
+    } finally {
+      setProcessing(false);
+    }
+  }, []);
 
   const onDrop = useCallback(
     async (files: File[]) => {
       const file = files[0];
       if (!file) return;
-      setLoading(true);
-      try {
-        const form = new FormData();
-        form.append("file", file);
-        const cv = await api.upload<CV>("/api/v1/cv/upload", form);
-        toast.success("CV uploaded — previous CV replaced");
-        setCvs([cv]);
-        setProfile(null);
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Upload failed");
-      } finally {
-        setLoading(false);
-      }
+      await runPipeline(file);
     },
-    [api]
+    [runPipeline]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -83,215 +119,171 @@ export default function CVPage() {
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
     },
     maxFiles: 1,
+    disabled: processing,
   });
 
-  const analyze = async (cvId: string) => {
-    setAnalyzingId(cvId);
-    setCvs((prev) => prev.map((cv) => (cv.id === cvId ? { ...cv, status: "processing" } : cv)));
-    try {
-      const p = await api.fetch<CVProfile>(`/api/v1/cv/${cvId}/analyze`, { method: "POST" });
-      setProfile(p);
-      toast.success("CV analyzed successfully");
-      await loadCvs();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Analysis failed");
-      await loadCvs();
-    } finally {
-      setAnalyzingId(null);
-    }
+  const reset = () => {
+    clearSavedResult();
+    setResult(null);
+    setCurrentStep("upload");
+    setStatusMsg("");
   };
 
-  const deleteCv = async (cvId: string) => {
-    setDeletingId(cvId);
-    try {
-      await api.fetch(`/api/v1/cv/${cvId}`, { method: "DELETE" });
-      toast.success("Old CV removed");
-      await loadCvs();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to remove CV");
-    } finally {
-      setDeletingId(null);
-    }
-  };
+  const progress =
+    currentStep === "done"
+      ? 100
+      : currentStep === "error"
+        ? 0
+        : Math.round((stepIndex(currentStep) / (STEP_ORDER.length - 1)) * 100);
 
-  const removeOlderCvs = async () => {
-    for (const cv of olderCvs) {
-      await deleteCv(cv.id);
-    }
-  };
-
-  const renderCvRow = (cv: CV, isCurrent = false) => (
-    <div
-      key={cv.id}
-      className={`flex items-center justify-between rounded-xl border p-4 ${
-        isCurrent ? "border-violet-500/30 bg-violet-500/5" : "border-white/10 bg-white/5"
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        <FileText className="h-5 w-5 text-violet-400" />
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-white">{cv.file_name}</span>
-            {isCurrent && <Badge>Current CV</Badge>}
-          </div>
-          <div className="text-sm text-white/40">
-            {new Date(cv.uploaded_at).toLocaleDateString()} · {cv.status}
-          </div>
-        </div>
+  if (!isStandaloneMode()) {
+    return (
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-6 text-amber-100">
+        <p className="font-medium">Full-stack mode active</p>
+        <p className="mt-2 text-sm text-amber-100/80">
+          Set <code className="rounded bg-black/30 px-1">NEXT_PUBLIC_STANDALONE=true</code> on
+          Vercel for database-free CV analysis.
+        </p>
       </div>
-      <div className="flex gap-2">
-        {isCurrent ? (
-          <>
-            <Button size="sm" onClick={() => analyze(cv.id)} disabled={analyzingId === cv.id}>
-              {analyzingId === cv.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              {analyzingId === cv.id ? "Analyzing..." : cv.status === "analyzed" ? "Re-analyze" : "Analyze"}
-            </Button>
-            {cv.status === "analyzed" && (
-              <Button size="sm" variant="secondary" onClick={() => startSearch(cv.id)} disabled={searching}>
-                {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Find Jobs
-              </Button>
-            )}
-          </>
-        ) : (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-red-300 hover:text-red-200"
-            onClick={() => deleteCv(cv.id)}
-            disabled={deletingId === cv.id}
-          >
-            {deletingId === cv.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-            Remove
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-
-  const startSearch = async (cvId: string) => {
-    setSearching(true);
-    try {
-      const session = await api.fetch<SearchSession>("/api/v1/sessions", {
-        method: "POST",
-        body: JSON.stringify({ cv_id: cvId }),
-      });
-      const matches = session.matches ?? [];
-      setJobMatches(matches);
-      const count = matches.length;
-      toast.success(`Found ${count} matching jobs!`, {
-        action: {
-          label: "View all",
-          onClick: () => router.push("/matches"),
-        },
-      });
-      setTimeout(() => {
-        document.getElementById("job-results")?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Search failed");
-    } finally {
-      setSearching(false);
-    }
-  };
+    );
+  }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-white">My CV</h1>
-        <p className="mt-1 text-white/50">Upload and analyze your resume</p>
+    <div className="mx-auto max-w-4xl space-y-8">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold text-white">CV Analyzer</h1>
+        <p className="mt-2 text-white/50">
+          Upload → Read PDF → Extract Text → Analyze Skills → Match Score
+        </p>
+        <p className="mt-1 text-xs text-emerald-400/80">
+          No database · Everything runs in your browser + Vercel
+        </p>
       </div>
 
-      <Card
-        {...getRootProps()}
-        className={`cursor-pointer border-dashed transition-colors ${
-          isDragActive ? "border-violet-500 bg-violet-500/10" : ""
-        }`}
-      >
-        <CardContent className="flex flex-col items-center justify-center py-16">
-          <input {...getInputProps()} />
-          {loading ? (
-            <Loader2 className="h-10 w-10 animate-spin text-violet-400" />
-          ) : (
-            <Upload className="h-10 w-10 text-violet-400" />
-          )}
-          <p className="mt-4 text-white/80">
-            {isDragActive ? "Drop your CV here" : "Drag & drop your CV (PDF or DOCX)"}
-          </p>
-          <p className="mt-1 text-sm text-white/40">or click to browse</p>
-        </CardContent>
-      </Card>
+      <StepIndicator current={currentStep} />
 
-      {activeCv && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Your CV</CardTitle>
-            {olderCvs.length > 0 && (
-              <Button size="sm" variant="ghost" className="text-red-300" onClick={removeOlderCvs}>
-                Remove {olderCvs.length} old CV{olderCvs.length > 1 ? "s" : ""}
-              </Button>
+      {(processing || currentStep === "done") && (
+        <div className="space-y-2">
+          <Progress value={progress} className="h-2" />
+          {statusMsg && processing && (
+            <p className="text-center text-sm text-white/50">{statusMsg}</p>
+          )}
+        </div>
+      )}
+
+      {!result && (
+        <Card
+          {...getRootProps()}
+          className={`cursor-pointer border-dashed transition-colors ${
+            isDragActive ? "border-violet-500 bg-violet-500/10" : ""
+          } ${processing ? "pointer-events-none opacity-60" : ""}`}
+        >
+          <CardContent className="flex flex-col items-center justify-center py-20">
+            <input {...getInputProps()} />
+            {processing ? (
+              <Loader2 className="h-12 w-12 animate-spin text-violet-400" />
+            ) : (
+              <Upload className="h-12 w-12 text-violet-400" />
             )}
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {renderCvRow(activeCv, true)}
-            {olderCvs.length > 0 && (
-              <div className="space-y-2 border-t border-white/10 pt-4">
-                <p className="text-sm text-white/40">Older uploads</p>
-                {olderCvs.map((cv) => renderCvRow(cv))}
-              </div>
+            <p className="mt-4 text-lg text-white/80">
+              {processing
+                ? "Processing your CV..."
+                : isDragActive
+                  ? "Drop your CV here"
+                  : "Drag & drop your CV (PDF or DOCX)"}
+            </p>
+            {!processing && (
+              <p className="mt-1 text-sm text-white/40">or click to browse</p>
             )}
           </CardContent>
         </Card>
       )}
 
-      {profile && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Extracted Profile</CardTitle>
-          </CardHeader>
-            <CardContent className="space-y-4">
-            {profile.ai_summary?.domains ? (
-              <div>
-                <h4 className="mb-2 text-sm text-white/60">Field</h4>
-                <div className="flex flex-wrap gap-2">
-                  {(profile.ai_summary.domains as string[]).map((d) => (
-                    <Badge key={d} variant="muted">{d}</Badge>
-                  ))}
+      {result && (
+        <>
+          <Card className="border-emerald-500/20 bg-emerald-500/5">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="h-6 w-6 text-emerald-400" />
+                <div>
+                  <CardTitle className="text-emerald-100">Analysis Complete</CardTitle>
+                  <p className="text-sm text-white/50">{result.fileName}</p>
                 </div>
               </div>
-            ) : null}
-            <div>
-              <h4 className="mb-2 text-sm text-white/60">Skills</h4>
-              <div className="flex flex-wrap gap-2">
-                {profile.skills.map((s) => (
-                  <Badge key={s}>{s}</Badge>
-                ))}
-              </div>
-            </div>
-            {profile.ai_summary?.summary ? (
-              <p className="text-sm text-white/70">{String(profile.ai_summary.summary)}</p>
-            ) : null}
-          </CardContent>
-        </Card>
-      )}
+              <Button variant="secondary" size="sm" onClick={reset}>
+                Upload New CV
+              </Button>
+            </CardHeader>
+          </Card>
 
-      {jobMatches.length > 0 && (
-        <div id="job-results" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-white">Your Job Matches</h2>
-              <p className="text-sm text-white/50">{jobMatches.length} jobs found for your profile</p>
-            </div>
-            <Button onClick={() => router.push("/matches")} className="gap-2">
-              View all <ArrowRight className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            {jobMatches.slice(0, 4).map((m) => (
-              <JobMatchCard key={m.id} match={m} />
-            ))}
-          </div>
-        </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-violet-400" />
+                Extracted Skills
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {result.profile.ai_summary?.primary_domains ? (
+                <div>
+                  <p className="mb-2 text-sm text-white/50">Your field</p>
+                  <div className="flex flex-wrap gap-2">
+                    {(result.profile.ai_summary.primary_domains as string[]).map((d) => (
+                      <Badge key={d} variant="muted">
+                        {d}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              <div>
+                <p className="mb-2 text-sm text-white/50">Skills found</p>
+                <div className="flex flex-wrap gap-2">
+                  {result.profile.skills.length ? (
+                    result.profile.skills.map((s) => <Badge key={s}>{s}</Badge>)
+                  ) : (
+                    <span className="text-white/40">No skills detected — try a clearer CV</span>
+                  )}
+                </div>
+              </div>
+              {result.profile.ai_summary?.summary ? (
+                <p className="text-sm text-white/70">{String(result.profile.ai_summary.summary)}</p>
+              ) : null}
+              <Button variant="ghost" size="sm" onClick={() => setShowText(!showText)}>
+                {showText ? "Hide" : "Show"} extracted text
+              </Button>
+              {showText && (
+                <pre className="max-h-48 overflow-auto rounded-lg bg-black/40 p-4 text-xs text-white/60">
+                  {result.rawText.slice(0, 3000)}
+                  {result.rawText.length > 3000 ? "..." : ""}
+                </pre>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-violet-400" />
+                Job Match Scores
+              </CardTitle>
+              <p className="text-sm text-white/50">
+                {result.matches.length} jobs ranked by your profile
+              </p>
+            </CardHeader>
+            <CardContent>
+              {result.matches.length === 0 ? (
+                <p className="text-white/50">No matches found. Try uploading a different CV.</p>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {result.matches.slice(0, 6).map((m) => (
+                    <JobMatchCard key={m.id} match={m} />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
       )}
     </div>
   );

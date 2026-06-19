@@ -3,6 +3,8 @@
 import { createContext, useContext, useMemo } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { apiFetch, type ApiClient } from "@/lib/api-client";
+import { createStandaloneClient } from "@/lib/standalone/client";
+import { isStandaloneMode } from "@/lib/standalone/config";
 
 const ApiContext = createContext<ApiClient | null>(null);
 
@@ -14,8 +16,16 @@ function makeDevClient(): ApiClient {
   };
 }
 
+export function StandaloneApiProvider({ children }: { children: React.ReactNode }) {
+  const client = useMemo(() => createStandaloneClient(), []);
+  return <ApiContext.Provider value={client}>{children}</ApiContext.Provider>;
+}
+
 export function DevApiProvider({ children }: { children: React.ReactNode }) {
-  const client = useMemo(() => makeDevClient(), []);
+  const client = useMemo(
+    () => (isStandaloneMode() ? createStandaloneClient() : makeDevClient()),
+    []
+  );
   return <ApiContext.Provider value={client}>{children}</ApiContext.Provider>;
 }
 
