@@ -1,0 +1,10 @@
+# Railway: use this when Root Directory = apps/api (Python API, NOT the Next.js web app)
+
+[phases.setup]
+nixPkgs = ["python312", "gcc", "pkg-config"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
+
+[start]
+cmd = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
