@@ -16,7 +16,7 @@ export default function DashboardPage() {
   useEffect(() => {
     api.fetch<DashboardStats>("/api/v1/skills/dashboard-stats").then(setStats).catch(console.error);
     api.fetch<JobMatch[]>("/api/v1/matches?min_score=0").then(setMatches).catch(console.error);
-  }, []);
+  }, [api]);
 
   const chartData = matches.slice(0, 6).map((m) => ({
     name: m.job.company.slice(0, 10),

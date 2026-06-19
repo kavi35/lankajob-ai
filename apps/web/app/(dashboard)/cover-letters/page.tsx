@@ -17,7 +17,7 @@ export default function CoverLettersPage() {
 
   useEffect(() => {
     api.fetch<JobMatch[]>("/api/v1/matches?min_score=0").then(setMatches).catch(console.error);
-  }, []);
+  }, [api]);
 
   const generate = async () => {
     if (!selectedId) return;

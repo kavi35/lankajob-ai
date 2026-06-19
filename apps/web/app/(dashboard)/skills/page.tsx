@@ -23,7 +23,7 @@ export default function SkillsPage() {
       )
       .then(setRecommendations)
       .catch(console.error);
-  }, []);
+  }, [api]);
 
   const radarData = gaps.slice(0, 6).map((g) => ({
     skill: g.skill_name,
