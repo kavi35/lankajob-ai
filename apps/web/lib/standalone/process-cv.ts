@@ -61,7 +61,9 @@ export async function processCvFile(
   });
   if (!extractRes.ok) {
     const err = await extractRes.json().catch(() => ({}));
-    throw new Error(err.detail || "Could not read your CV file");
+    throw new Error(
+      (err as { detail?: string }).detail || `Server error (${extractRes.status})`
+    );
   }
   const { text, fileName } = (await extractRes.json()) as {
     text: string;

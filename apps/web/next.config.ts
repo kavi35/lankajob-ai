@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  // Monorepo: lockfile lives at repo root when Railway builds with workspace
+  serverExternalPackages: ["unpdf", "mammoth"],
   outputFileTracingRoot: path.join(__dirname, "../.."),
 };
 

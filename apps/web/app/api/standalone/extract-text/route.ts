@@ -1,7 +1,13 @@
-import { PDFParse } from "pdf-parse";
+import { extractText, getDocumentProxy } from "unpdf";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+
+async function extractPdfText(buffer: Buffer): Promise<string> {
+  const pdf = await getDocumentProxy(new Uint8Array(buffer));
+  const { text } = await extractText(pdf, { mergePages: true });
+  return typeof text === "string" ? text : (text as string[]).join("\n");
+}
 
 export async function POST(req: Request) {
   try {
@@ -17,10 +23,7 @@ export async function POST(req: Request) {
     let text = "";
 
     if (lower.endsWith(".pdf") || file.type === "application/pdf") {
-      const parser = new PDFParse({ data: buffer });
-      const result = await parser.getText();
-      text = result.text || "";
-      await parser.destroy();
+      text = await extractPdfText(buffer);
     } else if (lower.endsWith(".docx") || file.type.includes("wordprocessingml")) {
       const mammoth = await import("mammoth");
       const result = await mammoth.extractRawText({ buffer });
@@ -34,7 +37,10 @@ export async function POST(req: Request) {
 
     if (!text.trim()) {
       return NextResponse.json(
-        { detail: "Could not extract text from this file" },
+        {
+          detail:
+            "No text found in this file. If it's a scanned PDF (image only), try a text-based PDF or DOCX.",
+        },
         { status: 422 }
       );
     }
@@ -42,9 +48,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ text: text.trim(), fileName: name });
   } catch (err) {
     console.error("extract-text error:", err);
-    return NextResponse.json(
-      { detail: err instanceof Error ? err.message : "Failed to parse CV" },
-      { status: 500 }
-    );
+    const msg = err instanceof Error ? err.message : "Failed to parse CV";
+    return NextResponse.json({ detail: `PDF read failed: ${msg}` }, { status: 500 });
   }
 }
