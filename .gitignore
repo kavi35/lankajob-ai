@@ -1,0 +1,16 @@
+node_modules/
+.next/
+.env
+.env.local
+apps/api/.env
+*.pyc
+__pycache__/
+.venv/
+venv/
+uploads/
+*.egg-info/
+dist/
+build/
+.DS_Store
+*.db
+apps/api/uploads/

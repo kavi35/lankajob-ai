@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: lankajob
+      POSTGRES_PASSWORD: lankajob
+      POSTGRES_DB: lankajob
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://lankajob:lankajob@postgres:5432/lankajob
+      CORS_ORIGINS: http://localhost:3000
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:-}
+      SUPABASE_STORAGE_BUCKET: cvs
+      CLERK_JWKS_URL: ${CLERK_JWKS_URL:-}
+      CLERK_ISSUER: ${CLERK_ISSUER:-}
+      SERPAPI_KEY: ${SERPAPI_KEY:-}
+    depends_on:
+      - postgres
+    volumes:
+      - ./apps/api:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  worker:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://lankajob:lankajob@postgres:5432/lankajob
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SERPAPI_KEY: ${SERPAPI_KEY:-}
+    depends_on:
+      - postgres
+    volumes:
+      - ./apps/api:/app
+    command: python -m app.workers.scheduler
+
+volumes:
+  postgres_data:
