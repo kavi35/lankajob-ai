@@ -109,8 +109,6 @@ export function jobSourceLabel(source: string): string {
   return labels[source] ?? source;
 }
 
-import type { JobListing } from "@/lib/api-client";
-
 export function normalizeTopJobsApplyUrl(url: string): string {
   return url.replace(
     "https://www.topjobs.lk/applicant/employer/JobAdvertismentServlet",

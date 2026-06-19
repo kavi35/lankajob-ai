@@ -255,7 +255,7 @@ export default function CVPage() {
                 <h4 className="mb-2 text-sm text-white/60">Field</h4>
                 <div className="flex flex-wrap gap-2">
                   {(profile.ai_summary.domains as string[]).map((d) => (
-                    <Badge key={d} variant="secondary">{d}</Badge>
+                    <Badge key={d} variant="muted">{d}</Badge>
                   ))}
                 </div>
               </div>
