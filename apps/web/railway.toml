@@ -1,0 +1,8 @@
+# Railway config when Root Directory = apps/web
+
+[build]
+buildCommand = "npm run build"
+
+[deploy]
+startCommand = "npm run start"
+restartPolicyType = "ON_FAILURE"

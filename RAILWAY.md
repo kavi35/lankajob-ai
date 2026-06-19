@@ -1,35 +1,59 @@
-# Railway — Deploy API Only (NOT the web app)
+# Railway deployment
 
-Vercel hosts the website. Railway must run **only** `apps/api` (Python FastAPI).
+This monorepo has two apps. Each Railway **service** must set **Root Directory** to the correct folder.
 
-If Railway logs show `npm install` or `web@0.1.0` — **Root Directory is wrong**.
+| Service | Root Directory | Start command |
+|---------|----------------|---------------|
+| **web** (Next.js) | `apps/web` | `npm run start` |
+| **api** (FastAPI) | `apps/api` | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
 
-## Setup
+If Root Directory is wrong, builds fail (e.g. "no start script" at repo root, or `npm install` peer errors).
 
-1. Delete any Railway service named `web`
-2. **New** → GitHub → `kavi35/lankajob-ai`
-3. Rename service to **`api`**
-4. **Settings** → **Root Directory** → `apps/api`
-5. **Settings** → **Deploy** → Start Command:
+---
+
+## Web service (Next.js)
+
+1. **Settings** → **Root Directory** → `apps/web`
+2. **Settings** → **Deploy** — clear any custom `--workspace=web` commands:
+   - Build: `npm run build` (or leave empty; `apps/web/railway.toml` sets this)
+   - Start: `npm run start`
+3. **Variables** (optional Clerk):
+   ```
+   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
+   CLERK_SECRET_KEY=sk_...
+   NEXT_PUBLIC_API_URL=https://YOUR-API-RAILWAY-URL
+   ```
+4. **Networking** → **Generate Domain**
+
+Config files: `apps/web/railway.toml`, `apps/web/nixpacks.toml`
+
+---
+
+## API service (FastAPI)
+
+1. **Settings** → **Root Directory** → `apps/api`
+2. **Settings** → **Deploy** → Start Command:
    ```
    uvicorn app.main:app --host 0.0.0.0 --port $PORT
    ```
-6. **Variables** — add Supabase + CORS (see README)
-7. **Networking** → **Generate Domain**
-8. Test: `https://YOUR-URL/health`
+3. **Variables**:
+   ```
+   DATABASE_URL=postgresql+asyncpg://...
+   SUPABASE_URL=https://xxx.supabase.co
+   SUPABASE_SERVICE_KEY=eyJ...
+   SUPABASE_STORAGE_BUCKET=cvs
+   CORS_ORIGINS=https://your-web-url
+   ```
+4. **Networking** → **Generate Domain**
+5. Test: `https://YOUR-API-URL/health`
 
-## Required env vars
+Config files: `apps/api/railway.toml`, `apps/api/nixpacks.toml`
 
-```
-DATABASE_URL=postgresql+asyncpg://...
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_SERVICE_KEY=eyJ...
-SUPABASE_STORAGE_BUCKET=cvs
-CORS_ORIGINS=https://your-app.vercel.app
-```
+---
 
-## Vercel
+## Vercel (alternative for web)
 
-```
-NEXT_PUBLIC_API_URL=https://YOUR-RAILWAY-URL
-```
+You can host the frontend on Vercel instead of Railway:
+
+- Root Directory: `apps/web`
+- `NEXT_PUBLIC_API_URL` → Railway API URL

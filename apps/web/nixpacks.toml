@@ -1,0 +1,10 @@
+# Used by Railway/Nixpacks when Root Directory = apps/web
+
+[phases.install]
+cmds = ["npm install --legacy-peer-deps"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm run start"
