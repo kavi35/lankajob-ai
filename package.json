@@ -7,6 +7,7 @@
     "build:web": "npm run build --workspace=web",
     "build": "npm run build --workspace=web",
     "start": "npm run start --workspace=web",
+    "postinstall": "node scripts/fix-workspace-native-deps.mjs",
     "dev:api": "cd apps/api && uvicorn app.main:app --reload --port 8000"
   }
 }
