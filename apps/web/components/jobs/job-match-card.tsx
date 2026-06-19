@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import type { JobMatch } from "@/lib/api-client";
-import { isDemoJob, jobApplyUrl, jobSourceLabel } from "@/lib/api-client";
+import { isDemoJob, isValidApplyUrl, jobApplyUrl, jobSourceLabel } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -18,6 +18,8 @@ type Props = {
 export function JobMatchCard({ match, onSave, onDetails }: Props) {
   const scoreColor =
     match.match_score >= 80 ? "text-emerald-400" : match.match_score >= 60 ? "text-amber-400" : "text-white/70";
+  const hasDirectApply = isValidApplyUrl(match.job.apply_url);
+  const applyHref = jobApplyUrl(match.job);
 
   return (
     <Card className="group transition-all hover:border-violet-500/30 hover:shadow-violet-500/10">
@@ -67,9 +69,10 @@ export function JobMatchCard({ match, onSave, onDetails }: Props) {
           </p>
         )}
         <div className="flex gap-2 pt-2">
-          <a href={jobApplyUrl(match.job)} target="_blank" rel="noopener noreferrer">
+          <a href={applyHref} target="_blank" rel="noopener noreferrer">
             <Button size="sm" className="gap-1">
-              Apply <ExternalLink className="h-3 w-3" />
+              {hasDirectApply ? "Apply" : "Find on TopJobs"}{" "}
+              <ExternalLink className="h-3 w-3" />
             </Button>
           </a>
           <Button size="sm" variant="secondary" className="gap-1" onClick={onDetails}>

@@ -1,6 +1,7 @@
 /** TopJobs.lk scraper for Vercel serverless (no Python API). */
 
 import type { JobListing } from "@/lib/api-client";
+import { isValidApplyUrl, normalizeTopJobsApplyUrl } from "@/lib/api-client";
 
 const TOPJOBS_ORIGIN = "https://www.topjobs.lk";
 const HEADERS = {
@@ -11,25 +12,25 @@ const HEADERS = {
 
 const FA_CODES = ["SDQ", "HNS", "ITT", "COM", "ACA", "SMM", "HAT", "BAF"];
 
-function normalizeApplyUrl(url: string): string {
-  return url.replace(
-    `${TOPJOBS_ORIGIN}/applicant/employer/JobAdvertismentServlet`,
-    `${TOPJOBS_ORIGIN}/employer/JobAdvertismentServlet`
-  );
-}
-
 function parseHref(href: string): string | null {
-  const popup = href.match(/openSizeWindow\('([^']+)'/i);
-  const path = popup?.[1] ?? href.match(/(employer\/JobAdvertismentServlet\?[^"'\s<>]+)/i)?.[1];
+  const popup = href.match(/openSizeWindow\s*\(\s*['"]([^'"]+)['"]/i);
+  const servletInHref = href.match(/(employer\/JobAdvertismentServlet\?[^"'\\s<>]+)/i);
+  const path = popup?.[1] ?? servletInHref?.[1];
   if (!path) return null;
-  if (path.startsWith("http")) return normalizeApplyUrl(path);
-  return normalizeApplyUrl(`${TOPJOBS_ORIGIN}/${path.replace(/^\//, "")}`);
+
+  let url: string;
+  if (path.startsWith("http")) {
+    url = path;
+  } else {
+    url = `${TOPJOBS_ORIGIN}/${path.replace(/^\//, "")}`;
+  }
+  return normalizeTopJobsApplyUrl(url);
 }
 
 function splitTitleCompany(raw: string): { title: string; company: string } {
   const text = raw.replace(/\s+/g, " ").trim();
   const match = text.match(
-    /(.+?)\s+([A-Z][\w\s&().'-]*(?:\(Pvt\)\s*Ltd\.?|Limited|PLC|Inc\.?)[.]?)$/i
+    /(.+?)\s+([A-Z][\w\s&().'-]*(?:\(Pvt\)\s*Ltd\.?|Limited|PLC|Inc\.?|Group of Companies)[.]?)$/i
   );
   if (match) return { title: match[1].trim().slice(0, 200), company: match[2].trim().slice(0, 200) };
   const words = text.split(" ");
@@ -52,23 +53,58 @@ function extractSkills(text: string): string[] {
   return common.filter((s) => lower.includes(s.toLowerCase()));
 }
 
+type ParsedLink = { applyUrl: string; rawText: string };
+
+function collectLinksFromHtml(html: string): ParsedLink[] {
+  const links: ParsedLink[] = [];
+  const seen = new Set<string>();
+
+  // <a href="..." or onclick="openSizeWindow(...)">Title Company</a>
+  const anchorRe =
+    /<a[^>]*(?:href|onclick)=["']([^"']*(?:JobAdvertismentServlet|openSizeWindow)[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = anchorRe.exec(html)) !== null) {
+    const applyUrl = parseHref(m[1]);
+    if (!applyUrl || !isValidApplyUrl(applyUrl) || seen.has(applyUrl)) continue;
+    seen.add(applyUrl);
+    const rawText = m[2].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    if (rawText.length >= 8) links.push({ applyUrl, rawText });
+  }
+
+  // onclick on other elements: openSizeWindow('employer/JobAdvertismentServlet?jc=...')
+  const popupRe =
+    /openSizeWindow\s*\(\s*['"]([^'"]*JobAdvertismentServlet\?[^'"]+)['"]\s*[,)]/gi;
+  while ((m = popupRe.exec(html)) !== null) {
+    const applyUrl = parseHref(m[0]);
+    if (!applyUrl || !isValidApplyUrl(applyUrl) || seen.has(applyUrl)) continue;
+    seen.add(applyUrl);
+    // Grab nearby text before the tag (best effort)
+    const before = html.slice(Math.max(0, m.index - 200), m.index);
+    const textMatch = before.match(/>([^<]{10,120})</);
+    links.push({
+      applyUrl,
+      rawText: textMatch?.[1]?.trim() || "Job on TopJobs.lk",
+    });
+  }
+
+  // Direct servlet URLs in page source
+  const directRe = /employer\/JobAdvertismentServlet\?(?:[^"'\\s<>&]+&)*jc=\d+[^"'\\s<>]*/gi;
+  while ((m = directRe.exec(html)) !== null) {
+    const applyUrl = parseHref(m[0]);
+    if (!applyUrl || !isValidApplyUrl(applyUrl) || seen.has(applyUrl)) continue;
+    seen.add(applyUrl);
+    links.push({ applyUrl, rawText: "Job on TopJobs.lk" });
+  }
+
+  return links;
+}
+
 function parseJobsFromHtml(html: string, sourceLabel: string): JobListing[] {
   const jobs: JobListing[] = [];
-  const seen = new Set<string>();
-  const linkRe =
-    /<a[^>]+href=["']([^"']*(?:JobAdvertismentServlet|openSizeWindow)[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
 
-  let m: RegExpExecArray | null;
-  while ((m = linkRe.exec(html)) !== null) {
-    const applyUrl = parseHref(m[1]);
-    if (!applyUrl || seen.has(applyUrl)) continue;
-    seen.add(applyUrl);
-
-    const rawText = m[2].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-    if (rawText.length < 8) continue;
-
+  for (const { applyUrl, rawText } of collectLinksFromHtml(html)) {
     const { title, company } = splitTitleCompany(rawText);
-    const description = `${title} at ${company}. View full details on TopJobs.lk.`;
+    const description = `${title} at ${company}. Apply on TopJobs.lk.`;
     jobs.push({
       id: crypto.randomUUID(),
       source: sourceLabel,
@@ -98,7 +134,10 @@ export async function scrapeTopJobs(limit = 80): Promise<JobListing[]> {
   for (const url of urls) {
     if (all.length >= limit) break;
     try {
-      const res = await fetch(url, { headers: HEADERS, next: { revalidate: 3600 } });
+      const res = await fetch(url, {
+        headers: HEADERS,
+        next: { revalidate: 3600 },
+      });
       if (!res.ok) continue;
       const html = await res.text();
       for (const job of parseJobsFromHtml(html, "topjobs")) {
@@ -112,20 +151,21 @@ export async function scrapeTopJobs(limit = 80): Promise<JobListing[]> {
     }
   }
 
-  return all;
+  return all.filter((j) => isValidApplyUrl(j.apply_url));
 }
 
 export function filterJobsForProfile(
   jobs: JobListing[],
   terms: string[]
 ): JobListing[] {
-  if (!terms.length) return jobs;
-  const scored = jobs.map((job) => {
+  const valid = jobs.filter((j) => isValidApplyUrl(j.apply_url));
+  if (!terms.length) return valid;
+  const scored = valid.map((job) => {
     const blob = `${job.title} ${job.description} ${job.company}`.toLowerCase();
     const hits = terms.filter((t) => blob.includes(t.toLowerCase())).length;
     return { job, hits };
   });
   scored.sort((a, b) => b.hits - a.hits);
   const withHits = scored.filter((s) => s.hits > 0).map((s) => s.job);
-  return withHits.length >= 5 ? withHits : jobs;
+  return withHits.length >= 5 ? withHits : valid;
 }

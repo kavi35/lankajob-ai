@@ -90,13 +90,30 @@ export type JobListing = {
   posted_at?: string | null;
 };
 
+export function isValidApplyUrl(url: string | null | undefined): boolean {
+  if (!url || !url.startsWith("http")) return false;
+  const lower = url.toLowerCase().replace(/\/$/, "");
+  if (
+    lower.includes("example.com") ||
+    lower.includes("linkedin.com/jobs/search") ||
+    lower.includes("jobs/search/?location=")
+  ) {
+    return false;
+  }
+  if (lower === "https://www.topjobs.lk/index.jsp" || lower.endsWith("/index.jsp")) {
+    return false;
+  }
+  return lower.includes("jobadvertismentservlet") && lower.includes("jc=");
+}
+
 export function isDemoJob(job: JobListing): boolean {
-  const url = job.apply_url.toLowerCase();
-  return (
-    url.includes("example.com") ||
-    url.includes("linkedin.com/jobs/search") ||
-    url.includes("jobs/search/?location=")
-  );
+  if (job.source === "sample") return true;
+  return !isValidApplyUrl(job.apply_url);
+}
+
+export function topJobsSearchUrl(title: string): string {
+  const q = encodeURIComponent(title.split(/\s+/).slice(0, 4).join(" "));
+  return `https://www.topjobs.lk/applicant/jobs/searchResult.jsp?keys=${q}`;
 }
 
 export function jobSourceLabel(source: string): string {
@@ -117,7 +134,9 @@ export function normalizeTopJobsApplyUrl(url: string): string {
 }
 
 export function jobApplyUrl(job: JobListing): string {
-  return normalizeTopJobsApplyUrl(job.apply_url);
+  const normalized = normalizeTopJobsApplyUrl(job.apply_url);
+  if (isValidApplyUrl(normalized)) return normalized;
+  return topJobsSearchUrl(job.title);
 }
 
 export type JobMatch = {
